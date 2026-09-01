@@ -1,0 +1,24 @@
+name: taller-dl-cuda
+channels:
+  - conda-forge
+  - nvidia
+  - dnachun
+  - defaults
+dependencies:
+  - python>=3.12
+  - ipykernel
+  - conda-forge::pytorch>=2.5.0
+  - conda-forge::torchvision
+  - nvidia::pytorch-cuda>=12.4
+  - conda-forge::wandb
+  - dnachun::torchviz
+  - numpy>=2.0
+  - scikit-learn
+  - matplotlib
+  - pandas
+  - nltk
+  - kaggle
+  - pip
+  - pip:
+      - torchinfo
+

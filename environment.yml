@@ -1,0 +1,22 @@
+name: taller-dl
+channels:
+  - conda-forge
+  - dnachun
+  - defaults
+dependencies:
+  - python>=3.12
+  - ipykernel
+  - conda-forge::pytorch
+  - conda-forge::torchvision
+  - conda-forge::wandb
+  - dnachun::torchviz
+  - numpy
+  - scikit-learn
+  - matplotlib
+  - pandas
+  - nltk
+  - kaggle
+  - pip
+  - pip:
+      - torchinfo
+
