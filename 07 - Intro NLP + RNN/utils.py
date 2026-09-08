@@ -25,7 +25,7 @@ def get_device():
     return "cpu"
 
 
-def get_num_workers(fraction=0.5, max_workers=8, linux_workers=None):
+def get_num_workers(fraction=0.5, min_workers=1, max_workers=8):
     """
     Devuelve la cantidad de procesos (num_workers) para los DataLoaders según el sistema operativo y los núcleos disponibles.
 
@@ -33,32 +33,30 @@ def get_num_workers(fraction=0.5, max_workers=8, linux_workers=None):
     En Linux los hijos se crean con fork (copia del proceso actual, con el Dataset ya en memoria).
     En Windows y macOS se crean con spawn: un intérprete nuevo que debe reconstruir el Dataset
     importándolo por nombre, y las clases definidas en un notebook no son importables -> errores de pickle.
-    Por eso en Windows y macOS devolvemos 0 (los datos se cargan en el proceso principal).
+    Por eso en Windows y macOS devolvemos siempre 0 (los datos se cargan en el proceso principal).
 
-    En Linux usamos una fracción de los núcleos disponibles, con un tope: más workers que núcleos no
-    acelera nada (compiten por la CPU con el proceso principal) y cada worker consume memoria.
-    Los núcleos se cuentan con os.sched_getaffinity, que respeta los límites del contenedor o de la
-    máquina virtual (Colab, Docker), a diferencia de os.cpu_count().
+    En Linux usamos una fracción de los núcleos disponibles, acotada entre min_workers y max_workers:
+    más workers que núcleos no acelera nada (compiten por la CPU con el proceso principal) y cada
+    worker consume memoria. Los núcleos se cuentan con os.sched_getaffinity, que respeta los límites
+    del contenedor o de la máquina virtual (Colab, Docker), a diferencia de os.cpu_count().
 
     Args:
-        fraction (float): Fracción de los núcleos disponibles a usar en Linux (default: 0.5).
-        max_workers (int): Tope de workers (default: 8). Importa sobre todo cuando cada muestra se lee
+        fraction (float): Fracción de los núcleos disponibles a usar (default: 0.5).
+        min_workers (int): Mínimo de workers (default: 1).
+        max_workers (int): Máximo de workers (default: 8). Importa sobre todo cuando cada muestra se lee
             de disco o pasa por transformaciones (imágenes); con datos ya en memoria, pocos workers alcanzan.
-        linux_workers (int, optional): Si se indica, en Linux se usa este valor fijo y se ignoran
-            fraction y max_workers.
+            Para fijar un valor exacto, usar min_workers = max_workers.
 
     Returns:
-        int: 0 en Windows/macOS; en Linux, linux_workers si se indicó, o max(1, min(max_workers, floor(núcleos * fraction))).
+        int: 0 en Windows/macOS; en Linux, floor(núcleos * fraction) acotado a [min_workers, max_workers].
     """
     if sys.platform != "linux":
         return 0
-    if linux_workers is not None:
-        return linux_workers
     try:
         cpus = len(os.sched_getaffinity(0))  # núcleos que este proceso puede usar
     except AttributeError:  # no disponible en algunas plataformas
         cpus = os.cpu_count() or 1
-    return max(1, min(max_workers, int(cpus * fraction)))
+    return max(min_workers, min(max_workers, int(cpus * fraction)))
 
 
 def evaluate(model, criterion, data_loader, device):
