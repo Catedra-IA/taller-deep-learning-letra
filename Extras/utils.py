@@ -57,7 +57,6 @@ def print_log(epoch, train_loss, val_loss):
         f"Epoch: {epoch + 1:03d} | Train Loss: {train_loss:.5f} | Val Loss: {val_loss:.5f}"
     )
 
-
 def train(
     model,
     optimizer,
