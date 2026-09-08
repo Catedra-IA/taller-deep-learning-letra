@@ -1,3 +1,5 @@
+import sys
+
 import torch
 import matplotlib.pyplot as plt
 from sklearn.metrics import (
@@ -6,6 +8,41 @@ from sklearn.metrics import (
     balanced_accuracy_score,
     classification_report,
 )
+
+
+def get_device():
+    """
+    Devuelve el mejor dispositivo disponible para PyTorch, en orden de preferencia:
+    "cuda" (GPU NVIDIA), "mps" (GPU Apple Silicon), "xpu" (GPU Intel) o "cpu".
+    """
+    if torch.cuda.is_available():
+        return "cuda"
+    if torch.backends.mps.is_available():
+        return "mps"
+    if hasattr(torch, "xpu") and torch.xpu.is_available():  # hasattr: versiones viejas de torch no tienen torch.xpu
+        return "xpu"
+    return "cpu"
+
+
+def get_num_workers(linux_workers=4):
+    """
+    Devuelve la cantidad de procesos (num_workers) para los DataLoaders según el sistema operativo.
+
+    num_workers > 0 hace que el DataLoader cargue los batches en procesos hijos, en paralelo.
+    En Linux los hijos se crean con fork (copia del proceso actual, con el Dataset ya en memoria).
+    En Windows y macOS se crean con spawn: un intérprete nuevo que debe reconstruir el Dataset
+    importándolo por nombre, y las clases definidas en un notebook no son importables -> errores de pickle.
+    Por eso en Windows y macOS devolvemos 0 (los datos se cargan en el proceso principal).
+
+    Args:
+        linux_workers (int): Cantidad de workers a usar en Linux (default: 4). El valor es arbitrario:
+            depende de los núcleos disponibles y del costo de cargar cada muestra. Importa sobre todo
+            cuando cada muestra se lee de disco o pasa por transformaciones (imágenes); con datos ya
+            en memoria, 0 workers rinde casi igual.
+    """
+    if sys.platform == "linux":
+        return linux_workers
+    return 0
 
 
 def evaluate(model, criterion, data_loader, device):
