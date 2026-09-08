@@ -2,6 +2,8 @@ import torch
 import matplotlib.pyplot as plt
 from sklearn.metrics import (
     accuracy_score,
+    confusion_matrix,
+    balanced_accuracy_score,
     classification_report,
 )
 
@@ -151,12 +153,28 @@ def plot_training(train_errors, val_errors):
     plt.show()  # Muestra el gráfico
 
 
-def model_classification_report(model, dataloader, device, nclasses, target_names=None):
+def model_classification_report(
+    model,
+    dataloader,
+    device,
+    nclasses,
+    digits=2,
+    do_confusion_matrix=False,
+    do_balanced_accuracy=False,
+    target_names=None,
+):
     """
-    Imprime accuracy y el reporte de clasificación (precision, recall, F1 por clase).
+    Imprime accuracy y el reporte de clasificación (precision, recall, F1 por clase) de un modelo multiclase.
 
     Args:
-        target_names (list[str], optional): nombres de las clases para el reporte. Si es None, se usan los índices 0..nclasses-1.
+        model (torch.nn.Module): Modelo a evaluar (su salida son logits de shape (batch, nclasses)).
+        dataloader (torch.utils.data.DataLoader): Datos de evaluación.
+        device (str): Dispositivo donde corre el modelo.
+        nclasses (int): Cantidad de clases.
+        digits (int, optional): Decimales del reporte. Por defecto 2.
+        do_confusion_matrix (bool, optional): Si es True, imprime también la matriz de confusión.
+        do_balanced_accuracy (bool, optional): Si es True, imprime también la precisión balanceada (promedio del recall por clase).
+        target_names (list[str], optional): Nombres de las clases para el reporte. Si es None, se usan los índices 0..nclasses-1.
     """
     if target_names is None:
         target_names = [str(i) for i in range(nclasses)]
@@ -172,6 +190,61 @@ def model_classification_report(model, dataloader, device, nclasses, target_name
             inputs = inputs.to(device)
             outputs = model(inputs)
             preds = torch.argmax(outputs, dim=1)
+            all_preds.extend(preds.cpu().numpy())
+            all_labels.extend(labels.numpy())
+
+    # Calcular precisión (accuracy)
+    accuracy = accuracy_score(all_labels, all_preds)
+    print(f"Accuracy: {accuracy:.4f}\n")
+
+    # Reporte de clasificación
+    report = classification_report(
+        all_labels, all_preds, target_names=target_names, digits=digits
+    )
+    print("Reporte de clasificación:\n", report)
+
+    # Matriz de confusión
+    if do_confusion_matrix:
+        cm = confusion_matrix(all_labels, all_preds)
+        print("Matriz de confusión:\n", cm, "\n")
+
+    # Precisión balanceada
+    if do_balanced_accuracy:
+        bal_acc = balanced_accuracy_score(all_labels, all_preds)
+        print(f"Precisión balanceada: {bal_acc:.4f}\n")
+
+
+def model_binary_classification_report(
+    model, dataloader, device, threshold=0.5, logits=True, target_names=None
+):
+    """
+    Imprime accuracy y el reporte de clasificación de un modelo binario con una única salida por muestra.
+
+    Args:
+        model (torch.nn.Module): Modelo a evaluar (salida de shape (batch, 1) o (batch,)).
+        dataloader (torch.utils.data.DataLoader): Datos de evaluación.
+        device (str): Dispositivo donde corre el modelo.
+        threshold (float, optional): Umbral para decidir la clase positiva. Por defecto 0.5.
+        logits (bool, optional): Si es True, la salida del modelo son logits y se aplica sigmoid antes del umbral.
+        target_names (list[str], optional): Nombres de las dos clases. Por defecto ["Normal", "Anomalous"].
+    """
+    if target_names is None:
+        target_names = ["Normal", "Anomalous"]
+
+    # Evaluación del modelo
+    model.eval()
+
+    all_preds = []
+    all_labels = []
+
+    with torch.no_grad():
+        for inputs, labels in dataloader:
+            inputs = inputs.to(device)
+            outputs = model(inputs)
+            if logits:
+                preds = (torch.sigmoid(outputs) >= threshold).long().squeeze()
+            else:
+                preds = (outputs >= threshold).long().squeeze()
             all_preds.extend(preds.cpu().numpy())
             all_labels.extend(labels.numpy())
 
@@ -227,4 +300,34 @@ def show_tensor_images(tensors, titles=None, figsize=(15, 5), vmin=None, vmax=No
         if titles and titles[i]:
             ax.set_title(titles[i])
         ax.axis("off")
+    plt.show()
+
+def show_tensor_image_with_mask_overlay(image_tensor, mask_tensor, title="Image with Mask Overlay", figsize=(8, 8), alpha=0.5, mask_color='Reds'):
+    """
+    Muestra una imagen con su máscara superpuesta.
+
+    Args:
+        image_tensor (torch.Tensor): Tensor que representa la imagen. Size (C, H, W).
+        mask_tensor (torch.Tensor): Tensor que representa la máscara. Size (H, W) o (1, H, W).
+        title (str, optional): Título de la imagen. Por defecto es "Image with Mask Overlay".
+        figsize (tuple, optional): Tamaño de la figura. Por defecto es (8, 8).
+        alpha (float, optional): Transparencia de la máscara (0=transparente, 1=opaco). Por defecto es 0.5.
+        mask_color (str, optional): Colormap de la máscara. Por defecto es 'Reds'.
+    """
+    plt.figure(figsize=figsize)
+    
+    # Mostrar imagen base
+    if image_tensor.shape[0] == 1:
+        plt.imshow(image_tensor.squeeze(), cmap="gray")
+    else:  # Assume RGB
+        plt.imshow(image_tensor.permute(1, 2, 0))
+        
+    if mask_tensor.dim() == 3:
+        mask_tensor = mask_tensor.squeeze(0)
+    
+    # Superponer la máscara
+    plt.imshow(mask_tensor, cmap=mask_color, alpha=alpha * (mask_tensor > 0), vmin=0, vmax=1)
+    
+    plt.title(title)
+    plt.axis("off")
     plt.show()
