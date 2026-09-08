@@ -1,3 +1,4 @@
+import os
 import sys
 
 import torch
@@ -24,9 +25,9 @@ def get_device():
     return "cpu"
 
 
-def get_num_workers(linux_workers=4):
+def get_num_workers(fraction=0.5, max_workers=8, linux_workers=None):
     """
-    Devuelve la cantidad de procesos (num_workers) para los DataLoaders según el sistema operativo.
+    Devuelve la cantidad de procesos (num_workers) para los DataLoaders según el sistema operativo y los núcleos disponibles.
 
     num_workers > 0 hace que el DataLoader cargue los batches en procesos hijos, en paralelo.
     En Linux los hijos se crean con fork (copia del proceso actual, con el Dataset ya en memoria).
@@ -34,15 +35,30 @@ def get_num_workers(linux_workers=4):
     importándolo por nombre, y las clases definidas en un notebook no son importables -> errores de pickle.
     Por eso en Windows y macOS devolvemos 0 (los datos se cargan en el proceso principal).
 
+    En Linux usamos una fracción de los núcleos disponibles, con un tope: más workers que núcleos no
+    acelera nada (compiten por la CPU con el proceso principal) y cada worker consume memoria.
+    Los núcleos se cuentan con os.sched_getaffinity, que respeta los límites del contenedor o de la
+    máquina virtual (Colab, Docker), a diferencia de os.cpu_count().
+
     Args:
-        linux_workers (int): Cantidad de workers a usar en Linux (default: 4). El valor es arbitrario:
-            depende de los núcleos disponibles y del costo de cargar cada muestra. Importa sobre todo
-            cuando cada muestra se lee de disco o pasa por transformaciones (imágenes); con datos ya
-            en memoria, 0 workers rinde casi igual.
+        fraction (float): Fracción de los núcleos disponibles a usar en Linux (default: 0.5).
+        max_workers (int): Tope de workers (default: 8). Importa sobre todo cuando cada muestra se lee
+            de disco o pasa por transformaciones (imágenes); con datos ya en memoria, pocos workers alcanzan.
+        linux_workers (int, optional): Si se indica, en Linux se usa este valor fijo y se ignoran
+            fraction y max_workers.
+
+    Returns:
+        int: 0 en Windows/macOS; en Linux, linux_workers si se indicó, o max(1, min(max_workers, floor(núcleos * fraction))).
     """
-    if sys.platform == "linux":
+    if sys.platform != "linux":
+        return 0
+    if linux_workers is not None:
         return linux_workers
-    return 0
+    try:
+        cpus = len(os.sched_getaffinity(0))  # núcleos que este proceso puede usar
+    except AttributeError:  # no disponible en algunas plataformas
+        cpus = os.cpu_count() or 1
+    return max(1, min(max_workers, int(cpus * fraction)))
 
 
 def evaluate(model, criterion, data_loader, device):
