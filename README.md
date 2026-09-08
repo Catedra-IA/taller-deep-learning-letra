@@ -14,6 +14,8 @@ TALLER-DEEP-LEARNING-LETRA/
 │   │   └── obligatorio/Obligatorio-letra.ipynb
 │   └── 2025/
 │       └── ...
+├── assets/
+│   └── imágenes usadas por las notebooks (se cargan por URL desde este repo)
 ├── 00 - Intro a PyTorch/
 │   └── Intro_PyTorch-letra.ipynb
 ├── 01 - Perceptron/
