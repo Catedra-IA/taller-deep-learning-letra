@@ -131,7 +131,7 @@ def train(
 
         if do_early_stopping and early_stopping.early_stop:
             print(
-                f"Detener entrenamiento en la época {epoch}, la mejor pérdida fue {early_stopping.best_score:.5f}"
+                f"Detener entrenamiento en la época {epoch + 1}, la mejor pérdida fue {early_stopping.best_score:.5f}"
             )
             break
 
@@ -151,7 +151,16 @@ def plot_training(train_errors, val_errors):
     plt.show()  # Muestra el gráfico
 
 
-def model_classification_report(model, dataloader, device, nclasses):
+def model_classification_report(model, dataloader, device, nclasses, target_names=None):
+    """
+    Imprime accuracy y el reporte de clasificación (precision, recall, F1 por clase).
+
+    Args:
+        target_names (list[str], optional): nombres de las clases para el reporte. Si es None, se usan los índices 0..nclasses-1.
+    """
+    if target_names is None:
+        target_names = [str(i) for i in range(nclasses)]
+
     # Evaluación del modelo
     model.eval()
 
@@ -171,9 +180,7 @@ def model_classification_report(model, dataloader, device, nclasses):
     print(f"Accuracy: {accuracy:.4f}\n")
 
     # Reporte de clasificación
-    report = classification_report(
-        all_labels, all_preds, target_names=[str(i) for i in range(nclasses)]
-    )
+    report = classification_report(all_labels, all_preds, target_names=target_names)
     print("Reporte de clasificación:\n", report)
 
 
