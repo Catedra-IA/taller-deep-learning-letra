@@ -1,3 +1,4 @@
+import copy
 import os
 import sys
 
@@ -86,16 +87,18 @@ def evaluate(model, criterion, data_loader, device):
 class EarlyStopping:
     def __init__(self, patience=5):
         """
+        Detiene el entrenamiento cuando la pérdida de validación deja de mejorar y guarda los mejores pesos.
+
         Args:
             patience (int): Cuántas épocas esperar después de la última mejora.
         """
         self.patience = patience
-        self.counter = 0
-        self.best_score = float("inf")
-        self.val_loss_min = float("inf")
+        self.counter = 0  # épocas seguidas sin mejora
+        self.best_score = float("inf")  # mejor pérdida de validación vista
+        self.best_state = None  # pesos del modelo en la mejor época
         self.early_stop = False
 
-    def __call__(self, val_loss):
+    def __call__(self, val_loss, model=None):
         if val_loss > self.best_score:
             self.counter += 1
             if self.counter >= self.patience:
@@ -103,6 +106,14 @@ class EarlyStopping:
         else:
             self.best_score = val_loss
             self.counter = 0
+            if model is not None:
+                # copia de los pesos: state_dict() devuelve referencias, sin deepcopy se pisarían en la próxima época
+                self.best_state = copy.deepcopy(model.state_dict())
+
+    def restore_best(self, model):
+        """Carga en el modelo los pesos de la mejor época (si se guardaron)."""
+        if self.best_state is not None:
+            model.load_state_dict(self.best_state)
 
 
 def print_log(epoch, train_loss, val_loss):
@@ -119,6 +130,7 @@ def train(
     device,
     do_early_stopping=True,
     patience=5,
+    restore_best=True,
     epochs=10,
     log_fn=print_log,
     log_every=1,
@@ -134,6 +146,7 @@ def train(
         val_loader (torch.utils.data.DataLoader): DataLoader que proporciona los datos de validación.
         device (str): El dispositivo donde se ejecutará el entrenamiento.
         patience (int): Número de épocas a esperar después de la última mejora en val_loss antes de detener el entrenamiento (default: 5).
+        restore_best (bool): Si es True y hay early stopping, al terminar se cargan en el modelo los pesos de la época con menor val_loss (default: True).
         epochs (int): Número de épocas de entrenamiento (default: 10).
         log_fn (function): Función que se llamará después de cada log_every épocas con los argumentos (epoch, train_loss, val_loss) (default: None).
         log_every (int): Número de épocas entre cada llamada a log_fn (default: 1).
@@ -176,7 +189,7 @@ def train(
         epoch_val_errors.append(val_loss)  # guardamos la perdida de validacion
 
         if do_early_stopping:
-            early_stopping(val_loss)  # llamamos al early stopping
+            early_stopping(val_loss, model)  # actualiza el contador y guarda los pesos si hubo mejora
 
         if log_fn is not None:  # si se pasa una funcion de log
             if (epoch + 1) % log_every == 0:  # loggeamos cada log_every epocas
@@ -188,15 +201,29 @@ def train(
             )
             break
 
+    if do_early_stopping and restore_best:
+        early_stopping.restore_best(model)  # el modelo queda con los pesos de la mejor época, no de la última
+
     return epoch_train_errors, epoch_val_errors
 
 
-def plot_training(train_errors, val_errors):
-    # Graficar los errores
+def plot_training(train_errors, val_errors, mark_min=False, title="Training and Validation Loss"):
+    """
+    Grafica la pérdida de entrenamiento y validación por época.
+
+    Args:
+        train_errors (list[float]): Pérdida de entrenamiento por época.
+        val_errors (list[float]): Pérdida de validación por época.
+        mark_min (bool, optional): Si es True, marca con una línea vertical la época con menor pérdida de validación.
+        title (str, optional): Título del gráfico.
+    """
     plt.figure(figsize=(10, 5))  # Define el tamaño de la figura
     plt.plot(train_errors, label="Train Loss")  # Grafica la pérdida de entrenamiento
     plt.plot(val_errors, label="Validation Loss")  # Grafica la pérdida de validación
-    plt.title("Training and Validation Loss")  # Título del gráfico
+    if mark_min:
+        best_epoch = min(range(len(val_errors)), key=lambda i: val_errors[i])
+        plt.axvline(best_epoch, color="gray", linestyle="--", label=f"Mín. val loss (época {best_epoch + 1})")
+    plt.title(title)  # Título del gráfico
     plt.xlabel("Epochs")  # Etiqueta del eje X
     plt.ylabel("Loss")  # Etiqueta del eje Y
     plt.legend()  # Añade una leyenda
