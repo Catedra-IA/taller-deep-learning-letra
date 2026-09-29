@@ -11,6 +11,7 @@ dependencies:
   - conda-forge::torchvision
   - nvidia::pytorch-cuda>=12.4
   - conda-forge::wandb
+  - conda-forge::datasets  # HuggingFace: fallback de CIFAR-10 en utils.py (clase 05 y Extras)
   - dnachun::torchviz
   - numpy>=2.0
   - scikit-learn

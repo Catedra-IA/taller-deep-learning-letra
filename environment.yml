@@ -9,6 +9,7 @@ dependencies:
   - conda-forge::pytorch
   - conda-forge::torchvision
   - conda-forge::wandb
+  - conda-forge::datasets  # HuggingFace: fallback de CIFAR-10 en utils.py (clase 05 y Extras)
   - dnachun::torchviz
   - numpy
   - scikit-learn
