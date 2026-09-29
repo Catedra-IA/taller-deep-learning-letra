@@ -84,6 +84,27 @@ def evaluate(model, criterion, data_loader, device):
     return total_loss / len(data_loader)  # retornamos la perdida promedio
 
 
+def accuracy(model, data_loader, device):
+    """
+    Calcula la accuracy (proporción de predicciones correctas) de un modelo de clasificación multiclase.
+
+    Args:
+        model (torch.nn.Module): Modelo a evaluar (su salida son logits de shape (batch, nclasses)).
+        data_loader (torch.utils.data.DataLoader): Datos de evaluación.
+        device (str): Dispositivo donde corre el modelo.
+
+    Returns:
+        float: Accuracy entre 0 y 1.
+    """
+    model.eval()
+    correct = 0
+    with torch.no_grad():
+        for x, y in data_loader:
+            preds = model(x.to(device)).argmax(dim=1)
+            correct += (preds.cpu() == y).sum().item()
+    return correct / len(data_loader.dataset)
+
+
 class EarlyStopping:
     def __init__(self, patience=5):
         """
