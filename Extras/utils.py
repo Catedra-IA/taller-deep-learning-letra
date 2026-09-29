@@ -409,3 +409,28 @@ def show_tensor_image_with_mask_overlay(image_tensor, mask_tensor, title="Image 
     plt.title(title)
     plt.axis("off")
     plt.show()
+
+
+# Si CIFAR demora mucho en descargarse, se puede usar este Dataset que lo carga desde HuggingFace.
+# from datasets import load_dataset
+# from torch.utils.data import Dataset
+# import torchvision.datasets as tv_datasets  # otro nombre: `datasets` es el paquete de HuggingFace
+
+# hf = load_dataset("uoft-cs/cifar10")
+
+# class CIFAR10(Dataset):
+#     def __init__(self, root=None, train=True, download=False, transform=None):
+#         self.ds = hf["train" if train else "test"]
+#         self.transform = transform
+#         self.classes = self.ds.features["label"].names
+#         self.targets = self.ds["label"]
+
+#     def __len__(self):
+#         return len(self.ds)
+
+#     def __getitem__(self, i):
+#         row = self.ds[i]
+#         img = row["img"]
+#         return (self.transform(img) if self.transform else img), row["label"]
+
+# tv_datasets.CIFAR10 = CIFAR10  # las notebooks importan este mismo módulo: sus datasets.CIFAR10(...) usan esta clase
